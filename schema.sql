@@ -1,0 +1,93 @@
+-- ============================================================================
+-- FICHIER : schema.sql
+-- PROJET : Système de Gestion d'Imprimerie (Séance 4)
+-- SGBD    : MySQL / MariaDB
+-- ============================================================================
+
+CREATE DATABASE IF NOT EXISTS imprimerie_db
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+USE imprimerie_db;
+
+-- 1. Table CLIENT
+CREATE TABLE IF NOT EXISTS CLIENT (
+    CLI_ID INT AUTO_INCREMENT PRIMARY KEY,
+    CLI_Nom VARCHAR(50) NOT NULL,
+    CLI_Prenom VARCHAR(30) NULL,
+    CLI_Tel VARCHAR(15) NOT NULL,
+    CLI_Email VARCHAR(80) UNIQUE NOT NULL
+) ENGINE=InnoDB;
+
+-- 2. Table DEVIS
+CREATE TABLE IF NOT EXISTS DEVIS (
+    DEV_ID INT AUTO_INCREMENT PRIMARY KEY,
+    DEV_DateEmission DATETIME DEFAULT CURRENT_TIMESTAMP,
+    DEV_Validite DATE NOT NULL,
+    DEV_MontantTotal DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (DEV_MontantTotal >= 0),
+    CLI_ID INT NOT NULL,
+    CONSTRAINT fk_devis_client
+        FOREIGN KEY (CLI_ID) REFERENCES CLIENT(CLI_ID)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- 3. Table COMMANDE
+CREATE TABLE IF NOT EXISTS COMMANDE (
+    CMD_ID INT AUTO_INCREMENT PRIMARY KEY,
+    CMD_Date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CMD_Statut VARCHAR(30) NOT NULL DEFAULT 'En attente'
+        CHECK (CMD_Statut IN ('En attente', 'En cours', 'Prêt', 'Livré')),
+    CMD_MontantHT DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (CMD_MontantHT >= 0),
+    CMD_MontantTVA DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (CMD_MontantTVA >= 0),
+    CMD_MontantTTC DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (CMD_MontantTTC >= 0),
+    CLI_ID INT NOT NULL,
+    DEV_ID INT NULL,
+    CONSTRAINT fk_cmd_client
+        FOREIGN KEY (CLI_ID) REFERENCES CLIENT(CLI_ID)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_cmd_devis
+        FOREIGN KEY (DEV_ID) REFERENCES DEVIS(DEV_ID)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- 4. Table ARTICLE (Supports, encres et consommables)
+CREATE TABLE IF NOT EXISTS ARTICLE (
+    ART_ID INT AUTO_INCREMENT PRIMARY KEY,
+    ART_Libelle VARCHAR(50) NOT NULL,
+    ART_StockActuel INT NOT NULL DEFAULT 0 CHECK (ART_StockActuel >= 0),
+    ART_SeuilAlerte INT NOT NULL DEFAULT 5 CHECK (ART_SeuilAlerte >= 0),
+    ART_PrixUnitaire DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (ART_PrixUnitaire >= 0)
+) ENGINE=InnoDB;
+
+-- 5. Table LIGNE_COMMANDE (Clé primaire composite)
+CREATE TABLE IF NOT EXISTS LIGNE_COMMANDE (
+    CMD_ID INT NOT NULL,
+    ART_ID INT NOT NULL,
+    LIG_Quantite INT NOT NULL CHECK (LIG_Quantite > 0),
+    LIG_PrixTotalHT DECIMAL(10,2) NOT NULL CHECK (LIG_PrixTotalHT >= 0),
+    PRIMARY KEY (CMD_ID, ART_ID),
+    CONSTRAINT fk_ligne_cmd
+        FOREIGN KEY (CMD_ID) REFERENCES COMMANDE(CMD_ID)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT fk_ligne_art
+        FOREIGN KEY (ART_ID) REFERENCES ARTICLE(ART_ID)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- 6. Table FACTURE
+CREATE TABLE IF NOT EXISTS FACTURE (
+    FAC_ID INT AUTO_INCREMENT PRIMARY KEY,
+    FAC_DatePaiement DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FAC_MontantPaye DECIMAL(10,2) NOT NULL CHECK (FAC_MontantPaye > 0),
+    FAC_TypePaiement VARCHAR(30) NOT NULL,
+    CMD_ID INT NOT NULL,
+    CONSTRAINT fk_facture_cmd
+        FOREIGN KEY (CMD_ID) REFERENCES COMMANDE(CMD_ID)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
